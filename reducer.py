@@ -92,6 +92,34 @@ with open('result.txt', 'w') as f:
         
         return finalEmitList
 
+    def emitCountyState(row):
+
+        county, state, date = row[0]
+        attributeMeanCenteredValues = row[1]
+
+        res = {}
+        for amv in attributeMeanCenteredValues:
+            attribute, value = amv[0], amv[1]
+            
+            if date not in res:
+                res[date] = {}
+            
+            res[date][attribute] = value
+
+        return ((county,state), res)
+
+
+    def mergeCountys(x,y):
+
+        if not x:
+            return y 
+        
+        if not y:
+            return x 
+        
+        x.update(y)
+
+        return x
 
 
 # at end of this
@@ -100,7 +128,11 @@ with open('result.txt', 'w') as f:
                     .map(emitCountyKeys)\
                     .reduceByKey(lambda x,y: ( x[0]+y[0] ,  ( x[1][0]+y[1][0], x[1][1]+y[1][1]  ) ) )\
                     .flatMap(emitMeanCenteredValues)\
-                    .reduceByKey(lambda x,y: x+y)
+                    .reduceByKey(lambda x,y: x+y)\
+                    .map(emitCountyState)\
+                    .reduceByKey(lambda x,y: mergeCountys(x,y))
     
-    pprint(climateRDD.take(1))
+    pprint(climateRDD.take(1), f)
+
+    pprint(climateRDD.count())
     
