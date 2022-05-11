@@ -113,7 +113,7 @@ def meanCenterAtCounty(row):
             if key in filter_keys:
                 d[key] = dict[key]
             else:
-                d[key] = float(dict[key]) - agg_dict[key]
+                d["gsod_"+key] = float(dict[key]) - agg_dict[key]
         meancentered_dict[date] = d
     
     return (row[0], meancentered_dict)
