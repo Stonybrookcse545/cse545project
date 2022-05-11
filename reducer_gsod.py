@@ -5,6 +5,7 @@ from collections import defaultdict
 
 sc = SparkContext(appName="GSOD")
 climateRDD = sc.textFile('gsod-county-cleaned-2019.csv', 32)
+climateGhcndRDD = sc.textFile('ghcnd-county-2019.csv', 32)
 sc.setLogLevel("WARN")
 
 required_keys = ['state', 'county', 'yearday', 'temp', 'dewp', 'slp', 'stp' , 'visib', 'wdsp', 'mxspd', 'gust', 'max', 'min', 'prcp' ,'sndp', 'frshtt']
@@ -70,29 +71,6 @@ def reduceAtCountyDaily(row):
     
     return (row[0], ans_dict)
 
-
-# def combineAttributeAtCountyAgg(row1, row2):
-#     dict1 = row1[1]
-#     dict2 = row2[1]
-
-#     ans_dict = defaultdict(float)
-
-#     for key in dict1.keys():
-#         if key in filter_keys:
-#             continue
-
-#         # elif key == "max" and (star in dict1[key] or star in dict2[key]):
-#         #     ans_dict["agg_"+key] = dict1[key]
-        
-#         # elif key == "min" and (star in dict1[key] or star in dict2[key]):
-#         #     ans_dict["agg_"+key] = dict1[key]
-        
-#         else:
-#             # print(key)
-#             ans_dict["agg_"+key] = float(dict1[key]) + float(dict2[key])
-
-#     return (row1[0] + row2[0], ans_dict)
-
 def meanCenterAtCounty(row):
     dict_list = row[1]
     dict_size = len(row[1])
@@ -118,6 +96,98 @@ def meanCenterAtCounty(row):
     
     return (row[0], meancentered_dict)
 
+def emitCountyKeys(row):
+    date, attribute, county, state = row[0]
+    count, s = row[1]
+
+    avgForDay = round(s / count, 1)
+
+    keyTuple = (county, state, attribute)
+    valueTuple = ( [(date, avgForDay)] , (count, s) )
+
+    return (keyTuple, valueTuple)
+    
+def emitMeanCenteredValues(row):
+    county, state, attribute = row[0]
+    listDatesValues = row[1][0]
+    count,s = row[1][1]
+
+    avgForAttribute = round(s/count , 1)
+
+    finalEmitList = []
+
+    for dateValuePair in listDatesValues:
+        date, value = dateValuePair
+        keyTuple = (county, state, date)
+        valueTuple = (attribute, value-avgForAttribute)
+        emitTuple = (keyTuple, [valueTuple])
+
+        finalEmitList.append(emitTuple)
+    
+    return finalEmitList
+
+def emitCountyState(row):
+
+    county, state, date = row[0]
+    attributeMeanCenteredValues = row[1]
+
+    res = {}
+    for amv in attributeMeanCenteredValues:
+        attribute, value = amv[0], amv[1]
+        
+        if date not in res:
+            res[date] = {}
+        
+        res[date][attribute] = value
+
+    return ((county,state), res)
+
+
+def mergeDictionaries(x,y):
+
+    if not x:
+        return y 
+    
+    if not y:
+        return x 
+    
+    x.update(y)
+
+    return x
+
+def processLine(line, keys, values):
+    
+    res = []
+
+    columns = list(csv.reader([line], delimiter=','))[0]
+
+    size = len(columns)
+
+    key = tuple()
+
+    for i in range(len(columns)):
+
+        if i in keys:
+            key += tuple([columns[i]])
+        
+        if i in values:
+            value = int(columns[i])
+            
+    
+    return ( key, (1,value) )
+
+def mergeDictionaries_1(dict1, dict2):
+    ans_dict = {}
+
+    for key in dict1.keys():
+        v1 = dict1[key]
+        v2 = (dict2[key] if key in dict2 else None)
+
+        ans_dict[key] = mergeDictionaries(v1, v2)
+    
+    return ans_dict
+
+
 """
     key, value: key = (county, state) value = dict(mean_centered_attribute values for that county)
 """
@@ -137,5 +207,41 @@ with open('result.txt', 'w') as f:
                             .reduceByKey(lambda x, y : x + y)\
                             .map(meanCenterAtCounty)
 
-    l = climateRDD.take(1)
-    pprint(l, f)
+    # l = climateRDD.take(1)
+    # pprint(l, f)
+
+    headers = climateGhcndRDD.first()
+    headerList = headers.split(",")
+    headerList = sc.broadcast(headerList)
+
+    keys = ['state', 'county', 'yearday','attribute']
+    values = ['value']
+    keyOrdinals = []
+    valueOrdinals = []
+
+    for i in range(len(headerList.value)):
+    
+        if headerList.value[i] in keys:
+            keyOrdinals.append(i)
+        
+        if headerList.value[i] in values:
+            valueOrdinals.append(i)
+    
+    climateGhcndRDD = climateGhcndRDD.filter(lambda line: line != headers)\
+                            .filter(lambda line: len(line.split(',')[keyOrdinals[1]]) > 0)
+    
+    climateGhcndRDD = climateGhcndRDD.map(lambda line: processLine(line, keyOrdinals, valueOrdinals))
+
+    climateGhcndRDD = climateGhcndRDD.reduceByKey(lambda a,b: (a[0]+b[0], a[1]+b[1]))\
+                                    .map(emitCountyKeys)\
+                                    .reduceByKey(lambda x,y: ( x[0]+y[0] ,  ( x[1][0]+y[1][0], x[1][1]+y[1][1]  ) ) )\
+                                    .flatMap(emitMeanCenteredValues)\
+                                    .reduceByKey(lambda x,y: x+y)\
+                                    .map(emitCountyState)\
+                                    .reduceByKey(lambda x,y: mergeDictionaries(x,y))
+    
+    # pprint(climateGhcndRDD.take(1), f)
+
+    finalRdd = climateRDD.union(climateGhcndRDD).reduceByKey(lambda x, y : mergeDictionaries_1(x, y))
+
+    pprint(finalRdd.take(1), f)
