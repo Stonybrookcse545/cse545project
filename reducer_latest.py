@@ -1,5 +1,4 @@
 from typing import OrderedDict
-from attr import attr
 from pyspark import SparkContext
 from pprint import pprint
 import csv
@@ -247,11 +246,12 @@ def emitCountyAttrDisasterPairs(row):
 
 #CLIMATE-DISASTER-RDD manipulations
 #merging climate and disaster RDD
+
 climateDisasterRDD = climateRDD.join(disaterRDD)
 
 climateDisasterRDD = climateDisasterRDD.flatMap(emitCountyAttrDisasterPairs)
 
-climateDisasterRDD.saveAsPickleFile('climateDisasterRDD')
+# climateDisasterRDD.saveAsPickleFile('climateDisasterRDD')
 
 item1 = climateDisasterRDD.collect()[0:1]
 

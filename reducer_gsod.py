@@ -123,7 +123,7 @@ def meanCenterAtCounty(row):
 """
 
 with open('result.txt', 'w') as f:
-
+    
     headers = climateRDD.first()
     headerList = headers.split(",")
     headerList = sc.broadcast(headerList)
