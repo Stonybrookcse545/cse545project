@@ -105,17 +105,18 @@ def meanCenterAtCounty(row):
                 agg_dict[key] += float(dict[key])
     
     agg_dict = {k : v/dict_size for k, v in agg_dict.items()}
-    meancentered_list = []
+    meancentered_dict = {}
     for dict in dict_list:
         d = defaultdict(float)
+        date = dict['yearday']
         for key in dict.keys():
             if key in filter_keys:
                 d[key] = dict[key]
             else:
-                d[key] = float(dict[key]) - agg_dict[key]
-        meancentered_list.append(d)
+                d["gsod_"+key] = float(dict[key]) - agg_dict[key]
+        meancentered_dict[date] = d
     
-    return (row[0], meancentered_list)
+    return (row[0], meancentered_dict)
 
 """
     key, value: key = (county, state) value = dict(mean_centered_attribute values for that county)
@@ -137,4 +138,4 @@ with open('result.txt', 'w') as f:
                             .map(meanCenterAtCounty)
 
     l = climateRDD.take(1)
-    pprint(len(l[0][1]), f)
+    pprint(l, f)
