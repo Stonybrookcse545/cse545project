@@ -10,6 +10,8 @@ sc = SparkContext(appName="PythonStreamingQueueStream")
 
 climateRDD = sc.textFile('ghcnd-county-2019.csv', 32)
 
+climateGSODRDD = sc.textFile("gsod-county-cleaned-2019.csv",32)
+
 sc.setLogLevel("WARN")
 
 def processLine(line, keys, values):
@@ -30,7 +32,7 @@ def processLine(line, keys, values):
         if i in values:
             value = int(columns[i])
             
-
+    
     return ( key, (1,value) )
 
 with open('result.txt', 'w') as f:
