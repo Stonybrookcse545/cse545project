@@ -470,7 +470,7 @@ def helperForShingles(dateRange):
 def emitWeeklyShingles(row):
     finalEmitList = []
 
-    keyTuple = row[0]
+    county, state = row[0]
     listOfDates = row[1]
     listOfDates.sort(key= lambda x: x[0])
 
@@ -490,14 +490,20 @@ def emitWeeklyShingles(row):
     
     # making weekly shingle strings
     if last - first <= 7:
-        valueTuple = helperForShingles(dateRange[first:last])
-        finalEmitList.append((keyTuple, valueTuple))
+        startDate, endDate, weeklyAttributeDict,\
+             _ , disasterType = helperForShingles(dateRange[first:last])
+
+        keyTuple = (county, state, startDate, endDate, disasterType)
+        finalEmitList.append((keyTuple, [weeklyAttributeDict]))
 
     else:
         for idx in range(first, last, 7):
             weekData = dateRange[idx: idx + 7]
-            valueTuple = helperForShingles(weekData)
-            finalEmitList.append((keyTuple, valueTuple))
+            startDate, endDate, weeklyAttributeDict,\
+                 _ , disasterType = helperForShingles(weekData)
+                 
+            keyTuple = (county, state, startDate, endDate, disasterType)
+            finalEmitList.append((keyTuple, [weeklyAttributeDict]))
     
     return finalEmitList
 
