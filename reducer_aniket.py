@@ -312,7 +312,6 @@ def process_disaster_file(row, headers, required_cols):
     
     return (map_key, key_dict)
 
-
 #disaster RDD method - emit only county and distater + date range
 def emitCountyDisasterRange(row):
     county, state, _ = row[0]
@@ -322,7 +321,7 @@ def emitCountyDisasterRange(row):
     endDate = detailsDict['incident_end_date']
     reportedDate = detailsDict['declaration_date']
 
-     #if either start or end date is not reported
+    #if either start or end date is not reported
 
     if startDate == 'NA' or startDate == '':
         startDate = reportedDate
@@ -474,7 +473,7 @@ def helperForShingles(dateRange):
         if not startFlag:
             startDate = date
             startFlag = 1
-
+        
         endDate = date
 
         for k,v in attributeDict.items():
