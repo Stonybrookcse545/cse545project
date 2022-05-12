@@ -32,7 +32,7 @@ def processLine(line, keys, values):
         if i in values:
             value = int(columns[i])
             
-    
+
     return ( key, (1,value) )
 
 with open('result.txt', 'w') as f:

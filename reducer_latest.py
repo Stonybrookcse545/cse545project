@@ -216,7 +216,7 @@ def emitCountyAttrDisasterPairs(row):
     # (date, attributeDict) - for climate attributeDict = value for temp etc
     # (disasterType, detailsDict) - for disaster detailsDict = details like startdate,etc
     for date, attributeDict in climateList:
-
+        
         # flag to check if any disaster was matched
         disasterFlag = 0
 
