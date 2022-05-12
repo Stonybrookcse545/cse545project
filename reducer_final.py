@@ -9,8 +9,8 @@ climateRDD = sc.textFile('gsod-county-cleaned-2017.csv', 32)
 climateGhcndRDD = sc.textFile('ghcnd-county-2017.csv', 32)
 sc.setLogLevel("WARN")
 
-required_keys = ['state', 'county', 'yearday', 'temp', 'dewp', 'slp', 'stp' , 'visib', 'wdsp', 'mxspd', 'gust', 'max', 'min', 'prcp' ,'sndp', 'frshtt']
-filter_keys = ['state', 'county', 'yearday', 'prcp']
+required_keys = ['state', 'county', 'yearday', 'temp', 'dewp', 'slp', 'stp' , 'visib', 'wdsp', 'mxspd', 'gust', 'max', 'min', 'sndp']
+filter_keys = ['state', 'county', 'yearday']
 star = "*"
 
 def process_row(row, headers):
@@ -86,7 +86,7 @@ def meanCenterAtCounty(row):
             else:
                 agg_dict[key] += float(dict[key])
     
-    agg_dict = {k : v/dict_size for k, v in agg_dict.items()}
+    agg_dict = {k : v / dict_size for k, v in agg_dict.items()}
     meancentered_dict = {}
     for dict in dict_list:
         d = defaultdict(float)
@@ -95,7 +95,7 @@ def meanCenterAtCounty(row):
             if key in filter_keys:
                 d[key] = dict[key]
             else:
-                d["gsod_"+key] = float(dict[key]) - agg_dict[key]
+                d["gsod_"+key] = round((float(dict[key]) - agg_dict[key])*2)/2
         meancentered_dict[date] = d
     
     return (row[0], meancentered_dict)
@@ -104,7 +104,7 @@ def emitCountyKeys(row):
     date, attribute, county, state = row[0]
     count, s = row[1]
 
-    avgForDay = round(s / count, 1)
+    avgForDay = round((s / count)*2)/2
 
     keyTuple = (county, state, attribute)
     valueTuple = ( [(date, avgForDay)] , (count, s) )
@@ -116,7 +116,7 @@ def emitMeanCenteredValues(row):
     listDatesValues = row[1][0]
     count,s = row[1][1]
 
-    avgForAttribute = round(s/count , 1)
+    avgForAttribute = round((s / count)*2)/2
 
     finalEmitList = []
 
@@ -159,28 +159,29 @@ def mergeDictionaries(x,y):
 
     return x
 
-def processLine(line, keys, values, countyOrdinal):
+def processLine(line, headerList):
     
-    res = []
-
     columns = list(csv.reader([line], delimiter=','))[0]
 
-    size = len(columns)
+    keyTuple = tuple()
+    valueTuple = tuple()
 
-    key = tuple()
+    for value, key in zip(columns, headerList.value):
 
-    for i in range(len(columns)):
-
-        if i in keys:
-            if i == countyOrdinal:
-                columns[i] = columns[i].lower().replace(' county', '')
-            key += tuple([columns[i]])
-        
-        if i in values:
-            value = int(columns[i])
+        if key in ['state', 'county', 'yearday','attribute']:
             
-    
-    return ( key, (1,value) )
+            if key == 'county':
+                value = value.lower().replace(' county', '')
+            
+            keyTuple += tuple([value])
+        
+        elif key == 'value':
+            valueTuple = int(value)
+
+    if len(keyTuple) < 4:
+        print(keyTuple)
+
+    return ( keyTuple, (1,valueTuple) )
 
 def mergeDictionaries_1(dict1, dict2):
     ans_dict = {}
@@ -225,6 +226,8 @@ keyOrdinals = []
 valueOrdinals = []
 countyOrdinal = 0
 
+filterKeys = ['PRCP','SNOW','SNWD','TMAX','TMIN']
+
 for i in range(len(headerList.value)):
 
     if headerList.value[i] in keys:
@@ -237,9 +240,10 @@ for i in range(len(headerList.value)):
         valueOrdinals.append(i)
 
 climateGhcndRDD = climateGhcndRDD.filter(lambda line: line != headers)\
-                        .filter(lambda line: len(line.split(',')[keyOrdinals[1]]) > 0)
+                                 .filter(lambda line: len ( list(csv.reader([line], delimiter=','))[0][keyOrdinals[1]] ) > 0)                                   
 
-climateGhcndRDD = climateGhcndRDD.map(lambda line: processLine(line, keyOrdinals, valueOrdinals, countyOrdinal))
+climateGhcndRDD = climateGhcndRDD.map(lambda line: processLine(line, headerList))\
+                                 .filter(lambda x: x[0][1] in ['PRCP','SNOW','SNWD','TMAX','TMIN'] and len(x[0][2]) > 0)                                  
 
 climateGhcndRDD = climateGhcndRDD.reduceByKey(lambda a,b: (a[0]+b[0], a[1]+b[1]))\
                                 .map(emitCountyKeys)\
@@ -353,11 +357,7 @@ def emitMap(row):
     county, state = row[0]
     dateAttributeDict = row[1]
 
-    with open('writing.txt', 'w') as f:
-        pprint((dateAttributeDict), f)
-
     #list(dateAttributeDict.items())
-    result = []
     resultDict = {}
 
     for k,v in dateAttributeDict.items():
@@ -368,7 +368,6 @@ def emitMap(row):
         resultDict[parsedDate] = v
 
     
-
     return ( ( county, state ),  list(resultDict.items()))
 
 
@@ -395,17 +394,17 @@ def emitCountyAttrDisasterPairs(row):
 
             if startDate <= date <= endDate:
                 disasterFlag = 1
-                keyTuple = (county, state , date)
-                valueTuple = (attributeDict, True, disasterType)
-                emitPair = (keyTuple, valueTuple)
+                keyTuple = (county, state)
+                valueTuple = (date, attributeDict, True, disasterType)
+                emitPair = (keyTuple, [valueTuple])
 
                 finalEmitList.append(emitPair)
         
         #meaning not mapped to any disaster - good right ? :)
         if disasterFlag == 0:
-            keyTuple = (county, state , date)
-            valueTuple = (attributeDict, False, '')
-            emitPair = (keyTuple, valueTuple)
+            keyTuple = (county, state)
+            valueTuple = (date, attributeDict, False, '')
+            emitPair = (keyTuple, [valueTuple])
 
             finalEmitList.append(emitPair)
     
@@ -419,27 +418,92 @@ def emitCountyAttrDisasterPairs(row):
 
 finalRdd = finalRdd.map(emitMap)
 
-with open('myfile.txt', 'w') as f:
-
-    pprint(finalRdd.take(2), f)
-
-# pprint(finalRdd.take(1))
-
-with open('disater.txt', 'w') as df:
-    pprint(disaterRDD.take(5), df)
-
 climateDisasterRDD = finalRdd.join(disaterRDD)
 
 # pprint(climateDisasterRDD.take(1))
 
-climateDisasterRDD = climateDisasterRDD.flatMap(emitCountyAttrDisasterPairs)
+climateDisasterRDD = climateDisasterRDD.flatMap(emitCountyAttrDisasterPairs)\
+    .reduceByKey(lambda a,b: a+b)
 
 # climateDisasterRDD.saveAsPickleFile('climateDisasterRDD')
 
-item1 = climateDisasterRDD.collect()[0:1]
+climateDisasterRDD = sc.pickleFile('climateDisasterRDD')
 
-# FINAL OUTPUT - key(county, state, date) value(attributeDict, disasterY/N, disasterType)
-with open('final_result.txt', 'w') as rf:
+# FINAL OUTPUT - key(county, state) value(date, attributeDict, disasterY/N, disasterType)
+# with open('result_final.txt', 'w') as rf:
+#     pprint(climateDisasterRDD.collect()[0:10], rf)
 
-    pprint(climateDisasterRDD.collect()[0:10], rf)
 
+## SIMILARITY SEARCH
+#function to create list of attributes of 7 days
+# value(date, attributeDict, disasterY/N, disasterType)
+def helperForShingles(dateRange):
+    weeklyAttributeDict = dict()
+
+    startDate = endDate = None
+    startFlag = 0
+    disasterBool, disasterType = False, ''
+
+    for idx in range(0, len(dateRange)):
+        if dateRange[idx] is None:
+            continue
+
+        date, attributeDict, idxDisasterBool, idxDisasterType = dateRange[idx]
+        disasterBool = idxDisasterBool or disasterBool
+        disasterType = idxDisasterType
+
+        if not startFlag:
+            startDate = date
+            startFlag = 1
+
+        endDate = date
+
+        for k,v in attributeDict.items():
+            #1_Tmax, 2_Tmax, etc
+            newKey = str(idx+1)+'_'+k
+            weeklyAttributeDict[newKey] = v
+    
+    return (startDate, endDate, weeklyAttributeDict, disasterBool, disasterType)
+
+
+#function takes list of date
+def emitWeeklyShingles(row):
+    finalEmitList = []
+
+    keyTuple = row[0]
+    listOfDates = row[1]
+    listOfDates.sort(key= lambda x: x[0])
+
+    # making list of 366 days and filling entries based on dayofYear found
+    dateRange = [None]*366
+    first = float('inf')
+    last = float('-inf')
+    for dateItem in listOfDates:
+        date = dateItem[0]
+        dayOfYear = date.timetuple().tm_yday
+        dateRange[dayOfYear] = dateItem
+
+        if dayOfYear < first:
+            first = dayOfYear
+        if dayOfYear > last:
+            last = dayOfYear
+    
+    # making weekly shingle strings
+    if last - first <= 7:
+        valueTuple = helperForShingles(dateRange[first:last])
+        finalEmitList.append((keyTuple, valueTuple))
+
+    else:
+        for idx in range(first, last, 7):
+            weekData = dateRange[idx: idx + 7]
+            valueTuple = helperForShingles(weekData)
+            finalEmitList.append((keyTuple, valueTuple))
+    
+    return finalEmitList
+
+
+
+shingleRDD = climateDisasterRDD.flatMap(emitWeeklyShingles)
+
+for item in shingleRDD.collect():
+    pprint(item)
