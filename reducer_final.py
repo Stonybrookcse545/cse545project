@@ -469,7 +469,8 @@ def helperForShingles(dateRange):
 
         date, attributeDict, idxDisasterBool, idxDisasterType = dateRange[idx]
         disasterBool = idxDisasterBool or disasterBool
-        disasterType = idxDisasterType
+        if idxDisasterType != '':
+            disasterType = idxDisasterType
 
         if not startFlag:
             startDate = date
