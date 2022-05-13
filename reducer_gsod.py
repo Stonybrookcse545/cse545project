@@ -193,7 +193,7 @@ def mergeDictionaries_1(dict1, dict2):
 """
 
 with open('result.txt', 'w') as f:
-
+    
     headers = climateRDD.first()
     headerList = headers.split(",")
     headerList = sc.broadcast(headerList)
@@ -241,7 +241,7 @@ with open('result.txt', 'w') as f:
                                     .reduceByKey(lambda x,y: mergeDictionaries(x,y))
     
     # pprint(climateGhcndRDD.take(1), f)
-
+    
     finalRdd = climateRDD.union(climateGhcndRDD).reduceByKey(lambda x, y : mergeDictionaries_1(x, y))
 
     pprint(finalRdd.take(1), f)
