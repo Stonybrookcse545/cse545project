@@ -531,19 +531,5 @@ def emitWeeklyShingles(row):
 
 shingleRDD = climateDisasterRDD.flatMap(emitWeeklyShingles)
 
-state = "FL"
-county1 = "bradford"
-county2 = "osceola"
-disaster = "hurricane"
-with open('similarity.txt', 'w') as f:
-    characteristicRDDSub1 = shingleRDD.filter(lambda x : x[0][0].lower() == county1 \
-                                            and x[0][1] == state and x[0][4]!='')
-    characteristicRDDSub2 = shingleRDD.filter(lambda x : x[0][0].lower() == county2 \
-                                            and x[0][1] == state and x[0][4].lower() == disaster)
-    
-    f.write('OUTPUT')
-
-    pprint(characteristicRDDSub1.take(1), f)
-
-# for item in shingleRDD.collect():
-#     pprint(item)
+for item in shingleRDD.collect():
+    pprint(item)
