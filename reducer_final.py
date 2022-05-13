@@ -92,10 +92,16 @@ def meanCenterAtCounty(row):
         d = defaultdict(float)
         date = dict['yearday']
         for key in dict.keys():
+
+            if key in ['temp', 'max', 'min']:
+                dict[key] = (dict[key] - 32) * (5/9)
+            
             if key in filter_keys:
                 d[key] = dict[key]
             else:
                 d["gsod_"+key] = round((float(dict[key]) - agg_dict[key])*2)/2
+
+
         meancentered_dict[date] = d
     
     return (row[0], meancentered_dict)
@@ -515,7 +521,7 @@ def emitWeeklyShingles(row):
 
         keyTuple = (county, state, startDate, endDate, disasterType)
         finalEmitList.append((keyTuple, [weeklyAttributeDict]))
-
+    
     else:
         for idx in range(first, last, 7):
             weekData = dateRange[idx: idx + 7]
@@ -530,6 +536,8 @@ def emitWeeklyShingles(row):
 
 
 shingleRDD = climateDisasterRDD.flatMap(emitWeeklyShingles)
+
+
 
 for item in shingleRDD.collect():
     pprint(item)
