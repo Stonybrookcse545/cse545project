@@ -1,18 +1,43 @@
+##########################################################################
+##
+## Original Code written for SBU's Big Data Analytics Project 
+##
+## Student Name: Sai Bhargav Varanasi
+## Student ID: 114707860
+## Student Name: Aniket Panda
+## Student ID: 114356301
+## Student Name: Akash Sateesh
+## Student ID: 113221752
+## Student Name: Priyanka Amol Dighe
+## Student ID: 113264191
+
 from pyspark import SparkContext
 from pprint import pprint
 import csv
 from collections import defaultdict
 from dateutil import parser
 
+# Initializing the Spark context
 sc = SparkContext(appName="GSOD")
 climateRDD = sc.textFile('gsod-county-cleaned-2017.csv', 32)
 climateGhcndRDD = sc.textFile('ghcnd-county-2017.csv', 32)
 sc.setLogLevel("WARN")
 
+# Required keys for GSOD Dataset. we do not need all features.
 required_keys = ['state', 'county', 'yearday', 'temp', 'dewp', 'slp', 'stp' , 'visib', 'wdsp', 'mxspd', 'gust', 'max', 'min', 'sndp']
+# Keys to identify the item in GSOD RDD.
 filter_keys = ['state', 'county', 'yearday']
 star = "*"
 
+
+"""
+
+Process each line of GSOD csv data set and returns
+
+key: (county, state, yearday)
+value: (1, attribute dictionary)
+
+"""
 def process_row(row, headers):
     
     key_dict = dict()
@@ -35,6 +60,15 @@ def process_row(row, headers):
     return (map_key, (1, key_dict))
 
 
+"""
+
+combines all the attributes at a county.
+@returns:
+
+key - sum of all observations at county
+value - combined attribute dictionary.
+
+"""
 
 def combineAttributeAtCounty(row1, row2):
     """
@@ -60,6 +94,18 @@ def combineAttributeAtCounty(row1, row2):
 
     return (row1[0] + row2[0], ans_dict)
 
+"""
+
+Input:
+key - (county, state, yearday)
+value - (sum of all observations at a county, aggregated attribute dictionary)
+
+Output:
+key: (county, state, yearday)
+value: (daily averaged attribute dict)
+
+"""
+
 def reduceAtCountyDaily(row):
     dict = row[1][1]
 
@@ -74,6 +120,19 @@ def reduceAtCountyDaily(row):
             ans_dict[key] = float(dict[key])/row[1][0]
     
     return (row[0], ans_dict)
+
+"""
+
+Normalizing all the attribute values.
+
+Input: key: (county, state, yearday)
+value: (daily average of all attributes dict)
+
+Output:
+key: (county, state, yearday)
+value: (normalized attribute dictionary)
+
+"""
 
 def meanCenterAtCounty(row):
     dict_list = row[1]
@@ -91,19 +150,7 @@ def meanCenterAtCounty(row):
             else:
                 agg_dict[key] += float(dict[key])
                 agg_dict_result[key].append(float(dict[key]))
-    
-    """
-    
-    At this step, 
-
-    agg_dict,
-
-    keys, values
-
-    PRCP, list of values
-    
-    """
-    
+ 
     for k,v in agg_dict_result.items():
 
         minV = min(v)
@@ -128,6 +175,17 @@ def meanCenterAtCounty(row):
     
     return (row[0], meancentered_dict)
 
+"""
+
+Emits the key value pairs at a county
+
+@returns
+
+key: (county, state, attribute)
+value: ( [date, average attribute value for a day], (count of observation, sum of all attribute values seen son far) )
+
+"""
+
 def emitCountyKeys(row):
     date, attribute, county, state = row[0]
     count, s = row[1]
@@ -139,6 +197,16 @@ def emitCountyKeys(row):
 
     return (keyTuple, valueTuple)
 
+"""
+
+Emits the normalized value of attribute at a county level for a given day.
+
+@returns
+key: (county, state, date)
+value: (attribute, normalized attribute value)
+
+"""
+
 def emitMeanCenteredValues(row):
     county, state, attribute = row[0]
     listDatesValues = row[1][0]
@@ -149,18 +217,9 @@ def emitMeanCenteredValues(row):
     finalEmitList = []
 
     valueList = []
-    # np.linalg.norm(an_array)
     for dateValuePair in listDatesValues:
         date, value = dateValuePair
         valueList.append(value)
-        # keyTuple = (county, state, date)
-        # if maxValue == minValue:
-        #     valueTuple =  (attribute, (value-avgForAttribute))
-        # else:
-        #     valueTuple = (attribute, (value-avgForAttribute) / (maxValue - minValue))
-        # emitTuple = (keyTuple, [valueTuple])
-        
-        # finalEmitList.append(emitTuple)
 
     valueNormalized = max(valueList) - min(valueList)
 
@@ -178,6 +237,14 @@ def emitMeanCenteredValues(row):
 
     return finalEmitList
 
+"""
+
+Emits the key value pairs where,
+key: (county, state)
+value: dictionary where key is date and value is dictionary of key being attribute and value being attribute value.
+
+"""
+
 def emitCountyState(row):
 
     county, state, date = row[0]
@@ -194,6 +261,11 @@ def emitCountyState(row):
 
     return ((county,state), res)
 
+"""
+
+Merge the two dictionaries.
+
+"""
 
 def mergeDictionaries(x,y):
 
@@ -206,6 +278,13 @@ def mergeDictionaries(x,y):
     x.update(y)
 
     return x
+
+"""
+
+Processing each line of the GHCND csv file for processing.
+Returns: Key: (state, county, yearday, attribute) , Value: (1, attribute_value)
+
+"""
 
 def processLine(line, headerList):
     
@@ -231,6 +310,11 @@ def processLine(line, headerList):
 
     return ( keyTuple, (1,valueTuple) )
 
+"""
+Removes features: yearday, state and county from the RDD after the processing is done.
+
+"""
+
 def removeKeysAttributesinAttributeDict(row):
 
     keyTuple = row[0]
@@ -249,7 +333,11 @@ def removeKeysAttributesinAttributeDict(row):
     
     return (keyTuple, valueTuple)
 
+"""
 
+Merge the two dictionaries whose value is also the dictionary.
+
+"""
 
 def mergeDictionaries_1(dict1, dict2):
     ans_dict = {}
@@ -267,7 +355,7 @@ def mergeDictionaries_1(dict1, dict2):
     key, value: key = (county, state) value = dict(mean_centered_attribute values for that county)
 """
 
-    
+# GSOD Dataset processing
 headers = climateRDD.first()
 headerList = headers.split(",")
 headerList = sc.broadcast(headerList)
@@ -281,19 +369,23 @@ climateRDD = climateRDD.map(lambda x : process_row(x, headerList))\
                         .reduceByKey(lambda x, y : x + y)\
                         .map(meanCenterAtCounty)
 
-# l = climateRDD.take(1)
-# pprint(l, f)
+"""
+      key, value: key = (county, state) value = dict(mean_centered_attribute values for that county)
+"""
 
+# GHCND Data set processing.
 headers = climateGhcndRDD.first()
 headerList = headers.split(",")
 headerList = sc.broadcast(headerList)
 
+# Required keys for RDD keys.
 keys = ['state', 'county', 'yearday','attribute']
 values = ['value']
 keyOrdinals = []
 valueOrdinals = []
 countyOrdinal = 0
 
+# Filtering keys/attributes that are required.
 filterKeys = ['PRCP','SNOW','SNWD','TMAX','TMIN']
 
 for i in range(len(headerList.value)):
@@ -321,16 +413,9 @@ climateGhcndRDD = climateGhcndRDD.reduceByKey(lambda a,b: (a[0]+b[0], a[1]+b[1])
                                 .map(emitCountyState)\
                                 .reduceByKey(lambda x,y: mergeDictionaries(x,y))
 
-# pprint(climateGhcndRDD.take(1), f)
-
 finalRdd = climateRDD.union(climateGhcndRDD).reduceByKey(lambda x, y : mergeDictionaries_1(x, y))
 
 finalRdd = finalRdd.map(lambda line: removeKeysAttributesinAttributeDict(line) )
-
-# with open('final_rdd.txt', 'w') as frf:
-
-#     pprint(finalRdd.collect(), frf)
-
 
 #DISASTER RDD methods
 #For disaster data - process each row of disaster and 
@@ -351,15 +436,11 @@ def process_disaster_file(row, headers, required_cols):
             value = value.split('T')[0]
             value = value.replace('-','')
 
-        # if key == 'place_code' and str(value) == '0':
-        #     return
         key_dict[key] = value
 
-    # print(key_dict)
     map_key = (key_dict['designated_area'], key_dict['state'], key_dict['fy_declared'])
     
     return (map_key, key_dict)
-
 
 #disaster RDD method - emit only county and distater + date range
 def emitCountyDisasterRange(row):
@@ -380,13 +461,6 @@ def emitCountyDisasterRange(row):
     detailsDict['incident_begin_date'] = parser.parse(startDate)
     detailsDict['incident_end_date'] = parser.parse(endDate)
     detailsDict['declaration_date'] = parser.parse(reportedDate)
-
-    # try:
-    #     detailsDict['incident_begin_date'] = parser.parse(startDate)
-    #     detailsDict['incident_end_date'] = parser.parse(endDate)
-    #     detailsDict['declaration_date'] = parser.parse(reportedDate)
-    # except:
-    #     print("ERROR IN DATE PARSING OF DISASTER" + str(detailsDict))
 
     disasterType = detailsDict['incident_type']
 
@@ -413,15 +487,12 @@ disaterRDD = disaterRDD.map(lambda row :process_disaster_file(row, headers, requ
     .map(emitCountyDisasterRange)\
     .reduceByKey(lambda x,y: x+y)
 
-# print(disaterRDD.collect()[0])
-
 # key, value: key = (county, state) value = dict(mean_centered_attribute values for that county)
 def emitMap(row):
 
     county, state = row[0]
     dateAttributeDict = row[1]
 
-    #list(dateAttributeDict.items())
     resultDict = {}
 
     for k,v in dateAttributeDict.items():
@@ -478,16 +549,9 @@ def emitCountyAttrDisasterPairs(row):
 #CLIMATE-DISASTER-RDD manipulations
 #merging climate and disaster RDD
 
-#pprint(disaterRDD.take(1))
-
 finalRdd = finalRdd.map(emitMap)
 
-# with open('disaster_results.txt', 'w') as df:
-#     pprint(disaterRDD.collect(), df)
-
 climateDisasterRDD = finalRdd.join(disaterRDD)
-
-# pprint(climateDisasterRDD.take(1))
 
 climateDisasterRDD = climateDisasterRDD.flatMap(emitCountyAttrDisasterPairs)\
     .reduceByKey(lambda a,b: a+b)
@@ -497,9 +561,6 @@ climateDisasterRDD.saveAsPickleFile('climateDisasterRDD')
 # climateDisasterRDD = sc.pickleFile('climateDisasterRDD')
 
 # FINAL OUTPUT - key(county, state) value(date, attributeDict, disasterY/N, disasterType)
-# with open('result_final.txt', 'w') as rf:
-#     pprint(climateDisasterRDD.collect()[0:10], rf)
-
 
 ## SIMILARITY SEARCH
 #function to create list of attributes of 7 days
@@ -575,9 +636,4 @@ def emitWeeklyShingles(row):
     
     return finalEmitList
 
-
-
 shingleRDD = climateDisasterRDD.flatMap(emitWeeklyShingles)
-
-with open('final_rdd.txt', 'w') as rf:
-    pprint(shingleRDD.collect(), rf)

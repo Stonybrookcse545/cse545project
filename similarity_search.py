@@ -1,11 +1,20 @@
+##########################################################################
+##
+## Original Code written for SBU's Big Data Analytics Project 
+##
+## Student Name: Sai Bhargav Varanasi
+## Student ID: 114707860
+## Student Name: Aniket Panda
+## Student ID: 114356301
+## Student Name: Akash Sateesh
+## Student ID: 113221752
+## Student Name: Priyanka Amol Dighe
+## Student ID: 113264191
+
 from doctest import COMPARISON_FLAGS
 import random
 import numpy as np
 import math
-import hashlib
-import csv
-import sys
-import datetime
 from pprint import pprint
 from pyspark import SparkContext, SparkConf
 
@@ -135,9 +144,6 @@ if __name__ == '__main__':
         characteristicRDDSub2 = characteristicRDD.filter(lambda x : x[0][0].lower() == county2 \
                                                 and x[0][1] == state2 and x[0][4].lower() == disaster2)
 
-
-        # pprint(characteristicRDDSub2.collect()[:10])
-        # exit(0)
         LHS_HASH_FUNCTIONS = generateHashFunctions(BANDS, 128)
         signatureMatrixRDD1 = characteristicRDDSub1.flatMap(generateSimilarityRDD)
         signatureMatrixRDD2 = characteristicRDDSub2.flatMap(generateSimilarityRDD)

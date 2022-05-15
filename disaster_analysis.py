@@ -1,9 +1,15 @@
 ##########################################################################
 ##
-## Original Code written by Sai Bhargav Varanasi for SBU's Big Data Analytics Course 
+## Original Code written for SBU's Big Data Analytics Project 
 ##
 ## Student Name: Sai Bhargav Varanasi
 ## Student ID: 114707860
+## Student Name: Aniket Panda
+## Student ID: 114356301
+## Student Name: Akash Sateesh
+## Student ID: 113221752
+## Student Name: Priyanka Amol Dighe
+## Student ID: 113264191
 
 import time
 import json
@@ -87,52 +93,16 @@ if __name__ == '__main__':
 
     with open(output_file, "w+") as OUTPUT_FILE:
 
-        # pprint(disastersRDD.filter(lambda x : x[DISASTERS_HEADER_DICT['designated_area']] == "Statewide").count(), OUTPUT_FILE)
-
         disastersRDD = disastersRDD.map(lambda x : (x[DISASTERS_HEADER_DICT['state']], x[DISASTERS_HEADER_DICT['fips']],
                                             x[DISASTERS_HEADER_DICT['fy_declared']],  x[DISASTERS_HEADER_DICT['incident_type']],
                                             x[DISASTERS_HEADER_DICT['incident_begin_date']], x[DISASTERS_HEADER_DICT['incident_end_date']], 
                                             x[DISASTERS_HEADER_DICT['place_code']], x[DISASTERS_HEADER_DICT['declaration_type']],
                                             x[DISASTERS_HEADER_DICT['designated_area']]))\
                                     .filter(lambda x : x[7] != "EM" and x[8]!= "Statewide")
-        
-        # pprint("*********** FIPS CODES **************", OUTPUT_FILE)
-        # pprint(fipsRDD.take(20), OUTPUT_FILE)
-        
+
         pprint("*********** DISASTERS **************", OUTPUT_FILE)
         disastersRDD = disastersRDD.filter(lambda x : x[0] in states)
         pprint(disastersRDD.take(20), OUTPUT_FILE)
-
-        # pprint("Distinct disasters ", OUTPUT_FILE)
-        # pprint(disastersRDD.map(lambda x : x[3]).distinct().collect(), OUTPUT_FILE)
-
-
-        # pprint("States with most disasters", OUTPUT_FILE)
-        
-        # pprint(disastersRDD.map(lambda x : (x[0], [(x[1], x[3])]))\
-        #                         .reduceByKey(lambda x, y: x + y)\
-        #                         .mapValues(lambda x : len(x))
-        #                         .sortBy(lambda x : x[1], ascending=False)
-        #                         .take(10), OUTPUT_FILE)
-
-        # pprint("Years with most disasters", OUTPUT_FILE)
-
-        # pprint(disastersRDD.map(lambda x : (x[2], [(x[1], x[3])]))\
-        #                         .reduceByKey(lambda x, y: x + y)\
-        #                         .mapValues(lambda x : len(x))
-        #                         .sortBy(lambda x : x[1], ascending=False)
-        #                         .take(10), OUTPUT_FILE)
-        
-        # pprint("Most common disasters > year 2000", OUTPUT_FILE)
-
-        # pprint(disastersRDD.filter(lambda x : x[2] > '2000')\
-        #                         .map(lambda x : (x[3], [(x[0], x[1], x[2])]))\
-        #                         .reduceByKey(lambda x, y : x + y)\
-        #                         .mapValues(lambda x : len(x))\
-        #                         .sortBy(lambda x : x[1], ascending=False)
-                                # .take(10), OUTPUT_FILE)
-
-        # pprint("Printing disaster categories of the top five states")
 
         pprint(disastersRDD.filter(lambda x : x[2] == "2018")\
                         .map(lambda x : ((x[8], x[0]), [x]))\
